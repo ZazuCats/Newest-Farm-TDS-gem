@@ -18,12 +18,12 @@ TDS:_start_rejoin_on_disconnect()
 
 -- [[ MAIN AFK LOOP ]]
 while true do
-    -- Wait for lobby to be ready
+    -- Wait for lobby
     repeat task.wait(1) 
     until game.Players.LocalPlayer.PlayerGui:FindFirstChild("LobbyGui") or 
            game.Players.LocalPlayer.PlayerGui:FindFirstChild("LobbyMain")
     
-    -- Setup for Crossroads
+    -- Setup loadout and mode
     TDS:Loadout("Crook Boss", "Trapper")
     TDS:Mode("Hardcore")
     
@@ -82,19 +82,5 @@ while true do
     
     -- Auto-teleport back to lobby
     TDS:TeleportToLobby()
-    task.wait(5)
-end    TDS:Upgrade(6)
-    TDS:Place("Crook Boss", 8.38963127, 2.34999776, 13.472085, -0.830651522, 0, 0.556792676, 0, 1, -0, -0.556792676, 0, -0.830651522) -- 7
-    TDS:Upgrade(7)
-    TDS:Upgrade(7)
-    TDS:Place("Crook Boss", 5.63429737, 2.34999847, 9.24946213, -0.993264973, 0, -0.11586494, 0, 1, -0, 0.11586494, -0, -0.993264973) -- 8
-    TDS:Upgrade(8)
-    TDS:Upgrade(8)
-    TDS:SellAll(24)
-    
-    print("✅ Strategy completed! Waiting for rewards...")
-    task.wait(15)
-    
-    -- Library automatically handles teleporting back to lobby after rewards
     task.wait(5)
 end
