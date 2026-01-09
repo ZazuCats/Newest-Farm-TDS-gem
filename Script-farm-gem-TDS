@@ -28,10 +28,9 @@ local function getRealMap()
 end
 
 task.spawn(function()
-    -- 1. pastiin ini BENERAN DI MATCH
+
     waitForGameStart()
 
-    -- 2. baru cek map
     local mapName = getRealMap()
 
     if mapName ~= TARGET_MAP then
