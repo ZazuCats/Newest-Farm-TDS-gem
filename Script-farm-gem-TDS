@@ -1,221 +1,70 @@
--- [[ 1. KONFIGURASI KEY SYSTEM & SAVE DATA ]]
-local SECURITY_KEY = "TDS-SOLO-2026" -- GANTI KEY DI SINI
-local CACHE_FILE = "TDS_Key_Auth.txt" -- Nama file penyimpan data
+-- [[ MAP CROSS CHECK (SAFE) ]]
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
--- [[ FUNGSI CEK KEY 24 JAM ]]
-local function CheckSavedKey()
-    -- Cek apakah executor support file system
-    if not makefolder or not writefile or not readfile then return false end
-    
-    if isfile(CACHE_FILE) then
-        local content = readfile(CACHE_FILE)
-        local savedTime = tonumber(content)
-        
-        if savedTime then
-            -- 86400 detik = 24 Jam
-            if (os.time() - savedTime) < 86400 then
-                return true -- Masih berlaku
-            end
+local TARGET_MAP = "Crossroads"
+local TDS_PLACE_ID = 3260590327
+
+local function waitForMap()
+    while true do
+        if workspace:FindFirstChild("Map") then
+            return workspace.Map.Name
         end
-    end
-    return false -- Tidak ada file / Kadaluarsa
-end
-
-local function SaveKey()
-    if writefile then
-        writefile(CACHE_FILE, tostring(os.time()))
+        if game.ReplicatedStorage:FindFirstChild("State")
+        and game.ReplicatedStorage.State:FindFirstChild("Map") then
+            return game.ReplicatedStorage.State.Map.Value
+        end
+        task.wait(1)
     end
 end
 
--- [[ 2. SCRIPT UTAMA (LIBRARY + STRAT) ]]
-function RunMainScript()
-    -- HAPUS GUI JIKA ADA
-    local existingGui = game.CoreGui:FindFirstChild("TDSKeySystem")
-    if existingGui then existingGui:Destroy() end
-    
-    print("🚀 Access Granted! Starting TDS Script...")
-    
-    -- CONFIG
-    _G.AutoStrat = true
-    _G.AutoSkip = true
-    _G.AutoSnowballs = true
-    _G.SendWebhook = false 
-    _G.Webhook = ""
+task.spawn(function()
+    local mapName = waitForMap()
+    if mapName ~= TARGET_MAP then
+        TeleportService:Teleport(TDS_PLACE_ID, player)
+    end
+end)
 
-    -- LIBRARY CUSTOM (TDS)
-    local TDS = (function()
-        if not game:IsLoaded() then game.Loaded:Wait() end
-        local function identify_game_state()
-            local players = game:GetService("Players")
-            local temp_player = players.LocalPlayer or players.PlayerAdded:Wait()
-            local temp_gui = temp_player:WaitForChild("PlayerGui")
-            while true do
-                if temp_gui:FindFirstChild("LobbyGui") then return "LOBBY"
-                elseif temp_gui:FindFirstChild("GameGui") then return "GAME" end
-                task.wait(1)
-            end
-        end
-        local game_state = identify_game_state()
-        local send_request = request or http_request or httprequest or (GetDevice and GetDevice().request)
-        if not send_request then warn("no http") return end
-        local teleport_service = game:GetService("TeleportService")
-        local marketplace_service = game:GetService("MarketplaceService")
-        local replicated_storage = game:GetService("ReplicatedStorage")
-        local remote_func = replicated_storage:WaitForChild("RemoteFunction")
-        local remote_event = replicated_storage:WaitForChild("RemoteEvent")
-        local players_service = game:GetService("Players")
-        local local_player = players_service.LocalPlayer or players_service.PlayerAdded:Wait()
-        local player_gui = local_player:WaitForChild("PlayerGui")
-        local TDS = {placed_towers = {}, active_strat = true, matchmaking_map = {["Hardcore"] = "hardcore", ["Pizza Party"] = "halloween", ["Badlands"] = "badlands", ["Polluted"] = "polluted", ["Survival"] = "survival"}}
-        shared.TDS_Table = TDS
-        pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/DuxiiT/auto-strat/refs/heads/main/Sources/GuiSource.lua"))() end)
-        local Console = shared.AutoStratGUI and shared.AutoStratGUI.Console
-        if shared.AutoStratGUI then shared.AutoStratGUI.Status(tostring(game_state)) end
-        local log_table = {}
-        local function log(text, color)
-            if not Console then return end
-            local colors = {red="#ff4d4d", orange="#ff9f43", yellow="#feca57", green="#00ff96"}
-            local timestamp = os.date("%H:%M:%S")
-            local msg = string.format("<font color='#555564'>[%s]</font> <font color='%s'>%s</font>", timestamp, colors[color] or "#00ff96", text)
-            local lbl = Instance.new("TextLabel")
-            lbl.RichText, lbl.Text, lbl.BackgroundTransparency = true, msg, 1
-            lbl.Size, lbl.AutomaticSize = UDim2.new(1,-8,0,0), Enum.AutomaticSize.Y
-            lbl.Font, lbl.TextSize, lbl.TextColor3 = Enum.Font.SourceSansSemibold, 14, Color3.new(1,1,1)
-            lbl.TextWrapped, lbl.TextXAlignment = true, Enum.TextXAlignment.Left
-            lbl.Parent = Console
-            table.insert(log_table, lbl)
-            if #log_table > 100 then log_table[1]:Destroy() table.remove(log_table, 1) end
-            local layout = Console:FindFirstChildOfClass("UIListLayout")
-            if layout then Console.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y) Console.CanvasPosition = Vector2.new(0, Console.CanvasSize.Y.Offset) end
-        end
-        local function check_res(d) if d==true or (type(d)=="table" and d.Success) or (type(d)=="userdata") then return true end return false end
-        local function get_wave() local c = player_gui.ReactGameTopGameDisplay.Frame.wave.container.value return tonumber(c.Text:match("(%d+)")) or 0 end
-        local function do_place(name, pos) log("Placing: "..name, "green") while true do local ok, res = pcall(function() return remote_func:InvokeServer("Troops", "Pl\208\176ce", {Rotation=CFrame.new(), Position=pos}, name) end) if ok and check_res(res) then return true end task.wait(0.25) end end
-        local function do_upgrade(obj) while true do local ok,r = pcall(function() return remote_func:InvokeServer("Troops", "Upgrade", "Set", {Troop=obj, Path=1}) end) if ok and check_res(r) then return true end task.wait(0.25) end end
-        local function do_sell(obj) while true do local ok,r = pcall(function() return remote_func:InvokeServer("Troops", "Sell", {Troop=obj}) end) if ok and check_res(r) then return true end task.wait(0.25) end end
-        function TDS:Mode(diff) if game_state ~= "LOBBY" then return false end log("🎮 Solo Direct Play: "..diff, "yellow") local mode = self.matchmaking_map[diff] or "survival" local success = false repeat local ok, res = pcall(function() return remote_func:InvokeServer("Multiplayer", "v2:start", {mode=mode, count=1}) end) if ok and check_res(res) then success = true end task.wait(0.5) until success return true end
-        function TDS:Loadout(...) if game_state ~= "LOBBY" then return end remote_func:InvokeServer("Inventory", "Unequip", "tower", "") task.wait(0.2) for _,t in ipairs({...}) do if t~="" then repeat local ok = pcall(function() remote_func:InvokeServer("Inventory", "Equip", "tower", t) end) until ok log("Equipped: "..t, "green") task.wait(0.4) end end return true end
-        function TDS:GameInfo(name, list) if game_state ~= "GAME" then return end pcall(function() replicated_storage.Network.Modifiers["RF:BulkVoteModifiers"]:InvokeServer(list or {}) end) log("🔍 Checking Map: "..name, "yellow") if marketplace_service:UserOwnsGamePassAsync(local_player.UserId, 10518590) then remote_func:InvokeServer("LobbyVoting", "Override", name) else local function scan() for _,g in ipairs(workspace:GetDescendants()) do if g.Name=="MapDisplay" and g:FindFirstChild("Title") and g.Title.Text:lower()==name:lower() then return true end end return false end if not scan() then remote_event:FireServer("LobbyVoting", "Veto") task.wait(2.5) if not scan() then log("❌ WRONG MAP! Rejoining...", "red") teleport_service:Teleport(3260590327, local_player) while true do task.wait(1) end end end end remote_event:FireServer("LobbyVoting", "Vote", name, Vector3.new(0,0,0)) task.wait(1) remote_event:FireServer("LobbyVoting", "Ready") task.spawn(function() local ui = player_gui:WaitForChild("ReactOverridesVote", 30) if ui then local frame = ui:WaitForChild("Frame", 10) if frame then repeat task.wait(0.5) until frame:FindFirstChild("votes") and frame.votes:FindFirstChild("container") and frame.votes.container:FindFirstChild("ready") remote_func:InvokeServer("Voting", "Skip") end end end end) end
-        function TDS:Place(name, x, y, z, ...) if game_state ~= "GAME" then return end local args = {...} if args[#args]=="stack" then y=y+20 end local existing = {} for _,t in ipairs(workspace.Towers:GetChildren()) do if t:FindFirstChild("Owner") and t.Owner.Value==local_player.UserId then existing[t]=true end end do_place(name, Vector3.new(x,y,z)) local new_t repeat for _,t in ipairs(workspace.Towers:GetChildren()) do if not existing[t] and t:FindFirstChild("Owner") and t.Owner.Value==local_player.UserId then new_t=t break end end task.wait(0.05) until new_t table.insert(self.placed_towers, new_t) end
-        function TDS:Upgrade(i) if self.placed_towers[i] then do_upgrade(self.placed_towers[i]) end end
-        function TDS:SellAll(w) task.spawn(function() if w then repeat task.wait(1) until get_wave()>=w end for _,t in ipairs(self.placed_towers) do do_sell(t) end self.placed_towers={} end) end
-        task.spawn(function() while true do if _G.AutoSkip then pcall(function() if player_gui.ReactOverridesVote.Frame.votes:FindFirstChild("vote") then remote_func:InvokeServer("Voting", "Skip") end end) end task.wait(1) end end)
-        return TDS
-    end)()
+-- [[ CONFIGURATION ]]
+_G.AutoStrat = true
+_G.AutoSkip = true
+_G.AutoSnowballs = true
 
-    -- START STRAT
-    TDS:Loadout("Crook Boss", "Trapper")
-    TDS:Mode("Hardcore")
-    TDS:GameInfo("Crossroads", {})
+-- [[ WEBHOOK SETTINGS ]]
+_G.SendWebhook = false -- Set to true to enable notifications
+_G.Webhook = "YOUR-WEBHOOK-URL-HERE" 
 
-    TDS:Place("Crook Boss", 11.0746298, 2.349998, 12.0490465, -0.79561305, 0, 0.605805159, 0, 0.99999994, -0, -0.605805218, 0, -0.795612931) -- 1
-    TDS:Upgrade(1)
-    TDS:Upgrade(1)
-    TDS:Place("Trapper", 2.67028093, 2.3500061, -37.728653, 0.753201902, 0, 0.657789409, -0, 1, -0, -0.657789409, 0, 0.753201902) -- 2
-    TDS:Upgrade(2)
-    TDS:Place("Trapper", -2.75824738, 2.35000801, -37.4817963, 0.670723617, 0, -0.741707385, -0, 1, -0, 0.741707444, 0, 0.670723557) -- 3
-    TDS:Upgrade(3)
-    TDS:Place("Trapper", -2.59712791, 2.35000801, -34.3472252, -0.967946351, -0, -0.251156926, -0, 1, -0, 0.251156926, 0, -0.967946351) -- 4
-    TDS:Upgrade(4)
-    TDS:Upgrade(2)
-    TDS:Upgrade(3)
-    TDS:Upgrade(4)
-    TDS:Place("Crook Boss", 11.1872864, 2.34999847, 9.03640366, 0.534949243, 0, 0.844884217, 0, 1, -0, -0.844884217, 0, 0.534949243) -- 5
-    TDS:Upgrade(5)
-    TDS:Upgrade(5)
-    TDS:Place("Crook Boss", 8.48154449, 2.34999824, 10.3917332, 0.441145629, 0, 0.897435606, 0, 1, -0, -0.897435486, 0, 0.441145688) -- 6
-    TDS:Upgrade(6)
-    TDS:Upgrade(6)
-    TDS:Place("Crook Boss", 8.38963127, 2.34999776, 13.472085, -0.830651522, 0, 0.556792676, 0, 1, -0, -0.556792676, 0, -0.830651522) -- 7
-    TDS:Upgrade(7)
-    TDS:Upgrade(7)
-    TDS:Place("Crook Boss", 5.63429737, 2.34999847, 9.24946213, -0.993264973, 0, -0.11586494, 0, 1, -0, 0.11586494, -0, -0.993264973) -- 8
-    TDS:Upgrade(8)
-    TDS:Upgrade(8)
-    TDS:SellAll(24)
-end
+-- [[ INITIALIZE LIBRARY ]]
+local TDS = loadstring(game:HttpGet("https://raw.githubusercontent.com/DuxiiT/auto-strat/refs/heads/main/Library.lua"))()
 
--- [[ 3. LOGIKA EKSEKUSI UTAMA ]]
-if CheckSavedKey() then
-    -- Key Valid di Cache, Langsung Gas
-    RunMainScript()
-else
-    -- Key Tidak Valid / Belum Ada, Buka UI
-    local KeySystemUI = Instance.new("ScreenGui")
-    local MainFrame = Instance.new("Frame")
-    local Title = Instance.new("TextLabel")
-    local KeyInput = Instance.new("TextBox")
-    local SubmitBtn = Instance.new("TextButton")
-    local Corner = Instance.new("UICorner")
-    local Corner2 = Instance.new("UICorner")
+-- [[ START STRATEGY ]]
+TDS:Loadout("Crook Boss", "Trapper")
+TDS:Mode("Hardcore")
+TDS:GameInfo("Crossroads", {})
 
-    KeySystemUI.Name = "TDSKeySystem"
-    KeySystemUI.Parent = game.CoreGui or game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    KeySystemUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    MainFrame.Name = "MainFrame"
-    MainFrame.Parent = KeySystemUI
-    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    MainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-    MainFrame.Size = UDim2.new(0, 300, 0, 150)
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-
-    Corner.CornerRadius = UDim.new(0, 10)
-    Corner.Parent = MainFrame
-
-    Title.Name = "Title"
-    Title.Parent = MainFrame
-    Title.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Title.BackgroundTransparency = 1.000
-    Title.Position = UDim2.new(0, 0, 0.1, 0)
-    Title.Size = UDim2.new(1, 0, 0, 30)
-    Title.Font = Enum.Font.GothamBold
-    Title.Text = "LOCKED SCRIPT (24H)"
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 20.000
-
-    KeyInput.Name = "KeyInput"
-    KeyInput.Parent = MainFrame
-    KeyInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    KeyInput.Position = UDim2.new(0.1, 0, 0.4, 0)
-    KeyInput.Size = UDim2.new(0.8, 0, 0, 35)
-    KeyInput.Font = Enum.Font.Gotham
-    KeyInput.PlaceholderText = "Enter Key Here..."
-    KeyInput.Text = ""
-    KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyInput.TextSize = 14.000
-
-    Corner2.Parent = KeyInput
-
-    SubmitBtn.Name = "SubmitBtn"
-    SubmitBtn.Parent = MainFrame
-    SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
-    SubmitBtn.Position = UDim2.new(0.25, 0, 0.7, 0)
-    SubmitBtn.Size = UDim2.new(0.5, 0, 0, 30)
-    SubmitBtn.Font = Enum.Font.GothamBold
-    SubmitBtn.Text = "CHECK KEY"
-    SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SubmitBtn.TextSize = 14.000
-
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.Parent = SubmitBtn
-
-    SubmitBtn.MouseButton1Click:Connect(function()
-        if KeyInput.Text == SECURITY_KEY then
-            SaveKey() -- SIMPAN DATA JIKA BENAR
-            
-            SubmitBtn.Text = "ACCESS GRANTED"
-            SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-            task.wait(1)
-            KeySystemUI:Destroy()
-            RunMainScript()
-        else
-            SubmitBtn.Text = "WRONG KEY!"
-            SubmitBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-            task.wait(1)
-            SubmitBtn.Text = "CHECK KEY"
-            SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
-        end
-    end)
-end
+TDS:Place("Crook Boss", 11.0746298, 2.349998, 12.0490465, -0.79561305, 0, 0.605805159, 0, 0.99999994, -0, -0.605805218, 0, -0.795612931) -- 1
+TDS:Upgrade(1)
+TDS:Upgrade(1)
+TDS:Place("Trapper", 2.67028093, 2.3500061, -37.728653, 0.753201902, 0, 0.657789409, -0, 1, -0, -0.657789409, 0, 0.753201902) -- 2
+TDS:Upgrade(2)
+TDS:Place("Trapper", -2.75824738, 2.35000801, -37.4817963, 0.670723617, 0, -0.741707385, -0, 1, -0, 0.741707444, 0, 0.670723557) -- 3
+TDS:Upgrade(3)
+TDS:Place("Trapper", -2.59712791, 2.35000801, -34.3472252, -0.967946351, -0, -0.251156926, -0, 1, -0, 0.251156926, 0, -0.967946351) -- 4
+TDS:Upgrade(4)
+TDS:Upgrade(2)
+TDS:Upgrade(3)
+TDS:Upgrade(4)
+TDS:Place("Crook Boss", 11.1872864, 2.34999847, 9.03640366, 0.534949243, 0, 0.844884217, 0, 1, -0, -0.844884217, 0, 0.534949243) -- 5
+TDS:Upgrade(5)
+TDS:Upgrade(5)
+TDS:Place("Crook Boss", 8.48154449, 2.34999824, 10.3917332, 0.441145629, 0, 0.897435606, 0, 1, -0, -0.897435486, 0, 0.441145688) -- 6
+TDS:Upgrade(6)
+TDS:Upgrade(6)
+TDS:Place("Crook Boss", 8.38963127, 2.34999776, 13.472085, -0.830651522, 0, 0.556792676, 0, 1, -0, -0.556792676, 0, -0.830651522) -- 7
+TDS:Upgrade(7)
+TDS:Upgrade(7)
+TDS:Place("Crook Boss", 5.63429737, 2.34999847, 9.24946213, -0.993264973, 0, -0.11586494, 0, 1, -0, 0.11586494, -0, -0.993264973) -- 8
+TDS:Upgrade(8)
+TDS:Upgrade(8)
+TDS:SellAll(24)
