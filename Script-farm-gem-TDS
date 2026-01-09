@@ -13,22 +13,37 @@ _G.SendWebhook = false
 _G.Webhook = "YOUR-WEBHOOK-URL-HERE"
 
 -- [[ INITIALIZE LIBRARY ]]
-local TDS = loadstring(game:HttpGet("https://raw.githubusercontent.com/DuxiiT/auto-strat/refs/heads/main/Library.lua "))()
+local TDS = loadstring(game:HttpGet("https://raw.githubusercontent.com/DuxiiT/auto-strat/refs/heads/main/Library.lua"))()
 
--- [[ SIMPLE AFK WRAPPER ]]
-local function execute_strategy()
-    -- Wait for game to be ready
-    repeat task.wait(1) until game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("GameGui")
+-- [[ START AUTO-REJOIN SYSTEM ]]
+TDS:_start_rejoin_on_disconnect()
+
+-- [[ MAIN AFK LOOP ]]
+while true do
+    -- Wait for lobby
+    repeat task.wait(1) 
+    until game.Players.LocalPlayer.PlayerGui:FindFirstChild("LobbyGui") or game.Players.LocalPlayer.PlayerGui:FindFirstChild("LobbyMain")
     
-    -- Execute your Crossroads strategy
+    -- Setup loadout and mode
     TDS:Loadout("Crook Boss", "Trapper")
     TDS:Mode("Hardcore")
-    TDS:GameInfo("Crossroads", {})
     
-    -- Wait for game to start
-    repeat task.wait(1) until workspace:FindFirstChild("Towers")
+    -- Try to join Crossroads
+    local success = pcall(function()
+        TDS:GameInfo("Crossroads", {})
+    end)
     
-    -- Place and upgrade towers
+    if not success then
+        print("❌ Failed to join Crossroads, library will auto-teleport back to lobby")
+        task.wait(5)
+        continue
+    end
+    
+    -- Wait for game to load
+    repeat task.wait(1) 
+    until workspace:FindFirstChild("Towers") or workspace:FindFirstChild("NPCs")
+    
+    -- Execute strategy
     TDS:Place("Crook Boss", 11.0746298, 2.349998, 12.0490465, -0.79561305, 0, 0.605805159, 0, 0.99999994, -0, -0.605805218, 0, -0.795612931) -- 1
     TDS:Upgrade(1)
     TDS:Upgrade(1)
@@ -55,211 +70,9 @@ local function execute_strategy()
     TDS:Upgrade(8)
     TDS:SellAll(24)
     
-    print("✅ Strategy completed successfully!")
-end
-
--- [[ MAIN AFK LOOP ]]
-while true do
-    pcall(function()
-        -- Check if we're in lobby
-        local player = game:GetService("Players").LocalPlayer
-        local gui = player:FindFirstChild("PlayerGui")
-        
-        if gui and (gui:FindFirstChild("LobbyGui") or gui:FindFirstChild("LobbyMain")) then
-            print("🏠 In lobby - waiting for game...")
-            task.wait(5)
-        elseif gui and gui:FindFirstChild("GameGui") then
-            print("🎮 In game - executing strategy...")
-            execute_strategy()
-            print("🔄 Strategy finished - waiting for rewards...")
-            task.wait(15) -- Wait for rewards screen
-        else
-            print("⏳ Unknown state - waiting...")
-            task.wait(3)
-        end
-    end)
+    print("✅ Strategy completed! Waiting for rewards...")
+    task.wait(15)
     
-    task.wait(1)
-endfunction WaitForLobby()
-    local startTime = tick()
-    while tick() - startTime < 45 do
-        if IsInLobby() then
-            return true
-        end
-        
-        -- If we're in game but shouldn't be, teleport out
-        if IsInGame() and not IsInLobby() then
-            TeleportToTDS()
-            startTime = tick()
-        end
-        
-        task.wait(1)
-    end
-    return false
+    -- Library automatically handles teleporting back to lobby after rewards
+    task.wait(5)
 end
-
-function WaitForGame()
-    local startTime = tick()
-    while tick() - startTime < 90 do
-        if IsInGame() then
-            task.wait(2) -- Extra wait for game to fully load
-            return true
-        end
-        task.wait(1)
-    end
-    return false
-end
-
-function TryJoinCrossroads()
-    local retryCount = 0
-    
-    while retryCount < _G.MaxRetries do
-        retryCount += 1
-        
-        pcall(function()
-            -- Try to select Crossroads map
-            if TDS:GameInfo("Crossroads", {}) then
-                -- Wait for game to start
-                if WaitForGame() then
-                    return true
-                end
-            end
-        end)
-        
-        print("🎯 Crossroads not available, attempt " .. retryCount .. "/" .. _G.MaxRetries)
-        
-        if retryCount >= _G.MaxRetries then break end
-        
-        -- Go back to lobby and wait
-        TeleportToTDS()
-        if not WaitForLobby() then
-            task.wait(_G.RetryDelay)
-        end
-    end
-    
-    return false
-end
-
--- [[ ANTI-AFK MOVEMENT ]]
-spawn(function()
-    while _G.AutoRejoin do
-        local character = game.Players.LocalPlayer.Character
-        if character then
-            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-            if humanoidRootPart then
-                -- Tiny random movement to prevent AFK kick
-                local currentPos = humanoidRootPart.Position
-                humanoidRootPart.CFrame = CFrame.new(currentPos + Vector3.new(math.random(-0.5, 0.5), 0, math.random(-0.5, 0.5)))
-                task.wait(0.1)
-                humanoidRootPart.CFrame = CFrame.new(currentPos)
-            end
-        end
-        task.wait(25) -- Move every 25 seconds
-    end
-end)
-
--- [[ DISCONNECTION HANDLER ]]
-game.Players.PlayerRemoving:Connect(function(player)
-    if player == game.Players.LocalPlayer then
-        print("🚨 Player disconnected, restarting script...")
-        -- This will trigger the rejoin logic below
-    end
-end)
-
--- [[ MAIN AFK LOOP ]]
-local function StartAFKSession()
-    while _G.AutoRejoin do
-        pcall(function()
-            print("🏠 Starting AFK session - Looking for Crossroads...")
-            
-            -- Ensure we're in lobby first
-            if not IsInLobby() then
-                TeleportToTDS()
-            end
-            
-            if not WaitForLobby() then
-                print("❌ Failed to reach lobby, retrying...")
-                TeleportToTDS()
-                task.wait(_G.RetryDelay)
-                return
-            end
-            
-            -- Setup loadout and mode
-            TDS:Loadout("Crook Boss", "Trapper")
-            TDS:Mode("Hardcore")
-            
-            -- Try to find and join Crossroads
-            if not TryJoinCrossroads() then
-                print("❌ Failed to find Crossroads after max retries. Restarting...")
-                TeleportToTDS()
-                task.wait(3)
-                return
-            end
-            
-            print("✅ Crossroads game found! Executing strategy...")
-            
-            -- Execute the strategy
-            TDS:Place("Crook Boss", 11.0746298, 2.349998, 12.0490465, -0.79561305, 0, 0.605805159, 0, 0.99999994, -0, -0.605805218, 0, -0.795612931) -- 1
-            TDS:Upgrade(1)
-            TDS:Upgrade(1)
-            TDS:Place("Trapper", 2.67028093, 2.3500061, -37.728653, 0.753201902, 0, 0.657789409, -0, 1, -0, -0.657789409, 0, 0.753201902) -- 2
-            TDS:Upgrade(2)
-            TDS:Place("Trapper", -2.75824738, 2.35000801, -37.4817963, 0.670723617, 0, -0.741707385, -0, 1, -0, 0.741707444, 0, 0.670723557) -- 3
-            TDS:Upgrade(3)
-            TDS:Place("Trapper", -2.59712791, 2.35000801, -34.3472252, -0.967946351, -0, -0.251156926, -0, 1, -0, 0.251156926, 0, -0.967946351) -- 4
-            TDS:Upgrade(4)
-            TDS:Upgrade(2)
-            TDS:Upgrade(3)
-            TDS:Upgrade(4)
-            TDS:Place("Crook Boss", 11.1872864, 2.34999847, 9.03640366, 0.534949243, 0, 0.844884217, 0, 1, -0, -0.844884217, 0, 0.534949243) -- 5
-            TDS:Upgrade(5)
-            TDS:Upgrade(5)
-            TDS:Place("Crook Boss", 8.48154449, 2.34999824, 10.3917332, 0.441145629, 0, 0.897435606, 0, 1, -0, -0.897435486, 0, 0.441145688) -- 6
-            TDS:Upgrade(6)
-            TDS:Upgrade(6)
-            TDS:Place("Crook Boss", 8.38963127, 2.34999776, 13.472085, -0.830651522, 0, 0.556792676, 0, 1, -0, -0.556792676, 0, -0.830651522) -- 7
-            TDS:Upgrade(7)
-            TDS:Upgrade(7)
-            TDS:Place("Crook Boss", 5.63429737, 2.34999847, 9.24946213, -0.993264973, 0, -0.11586494, 0, 1, -0, 0.11586494, -0, -0.993264973) -- 8
-            TDS:Upgrade(8)
-            TDS:Upgrade(8)
-            TDS:SellAll(24)
-            
-            print("🎉 Strategy completed successfully!")
-            
-            -- Wait for rewards screen and teleport back to lobby
-            task.wait(12)
-            TeleportToTDS()
-            task.wait(4)
-        end)
-        
-        -- If anything fails, teleport back to lobby and retry
-        if not IsInLobby() then
-            TeleportToTDS()
-            task.wait(_G.RetryDelay)
-        end
-    end
-end
-
--- [[ START AFK SESSION ]]
-print("🚀 Starting 100% AFK Crossroads strat...")
-StartAFKSession()TDS:Place("Trapper", -2.75824738, 2.35000801, -37.4817963, 0.670723617, 0, -0.741707385, -0, 1, -0, 0.741707444, 0, 0.670723557) -- 3
-TDS:Upgrade(3)
-TDS:Place("Trapper", -2.59712791, 2.35000801, -34.3472252, -0.967946351, -0, -0.251156926, -0, 1, -0, 0.251156926, 0, -0.967946351) -- 4
-TDS:Upgrade(4)
-TDS:Upgrade(2)
-TDS:Upgrade(3)
-TDS:Upgrade(4)
-TDS:Place("Crook Boss", 11.1872864, 2.34999847, 9.03640366, 0.534949243, 0, 0.844884217, 0, 1, -0, -0.844884217, 0, 0.534949243) -- 5
-TDS:Upgrade(5)
-TDS:Upgrade(5)
-TDS:Place("Crook Boss", 8.48154449, 2.34999824, 10.3917332, 0.441145629, 0, 0.897435606, 0, 1, -0, -0.897435486, 0, 0.441145688) -- 6
-TDS:Upgrade(6)
-TDS:Upgrade(6)
-TDS:Place("Crook Boss", 8.38963127, 2.34999776, 13.472085, -0.830651522, 0, 0.556792676, 0, 1, -0, -0.556792676, 0, -0.830651522) -- 7
-TDS:Upgrade(7)
-TDS:Upgrade(7)
-TDS:Place("Crook Boss", 5.63429737, 2.34999847, 9.24946213, -0.993264973, 0, -0.11586494, 0, 1, -0, 0.11586494, -0, -0.993264973) -- 8
-TDS:Upgrade(8)
-TDS:Upgrade(8)
-TDS:SellAll(24)
