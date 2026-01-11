@@ -198,38 +198,11 @@ end
 create_toggle("Auto Skip Waves", "AutoSkip")
 create_toggle("Auto Collect Pickups", "AutoPickups")
 create_toggle("Auto Chain", "AutoChain")
+create_toggle("Auto Return To Lobby", "AutoRTL")
 create_toggle("Auto DJ Booth", "AutoDJ")
 create_toggle("Enable Anti-Lag", "AntiLag")
 create_toggle("Claim Rewards", "ClaimRewards")
 create_toggle("Send Discord Webhook", "SendWebhook")
-
-local function create_button(display_name, callback)
-    local btn_bg = Instance.new("Frame", settings_scrolling)
-    btn_bg.Size = UDim2.new(1, -10, 0, 35)
-    btn_bg.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
-    Instance.new("UICorner", btn_bg).CornerRadius = UDim.new(0, 6)
-
-    local label = Instance.new("TextLabel", btn_bg)
-    label.Size = UDim2.new(1, -20, 1, 0)
-    label.Position = UDim2.new(0, 10, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = display_name
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.Font = Enum.Font.GothamSemibold
-    label.TextSize = 12
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local btn = Instance.new("TextButton", btn_bg)
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-
-    btn.MouseButton1Click:Connect(function()
-        if typeof(callback) == "function" then
-            callback()
-        end
-    end)
-end
 
 create_button("Teleport to TDS Lobby", function()
     if typeof(send_to_lobby) == "function" then
