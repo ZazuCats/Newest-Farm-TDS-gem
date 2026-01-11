@@ -8,7 +8,7 @@ _G.SendWebhook = false -- Set to true to enable notifications
 _G.Webhook = "YOUR-WEBHOOK-URL-HERE" 
 
 -- [[ INITIALIZE LIBRARY ]]
-local TDS = loadstring(game:HttpGet("https://raw.githubusercontent.com/ZazuCats/Newest-Farm-TDS-gem/refs/heads/main/Functions"))()
+local TDS = loadstring(game:HttpGet("https://raw.githubusercontent.com/ZazuCats/Newest-Farm-TDS-gem/refs/heads/main/Functions.lua"))()
 
 -- [[ START STRATEGY ]]
 TDS:Loadout("Crook Boss", "Trapper")
