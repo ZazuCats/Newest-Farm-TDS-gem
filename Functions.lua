@@ -89,7 +89,7 @@ local upgrade_history = {}
 shared.TDS_Table = TDS
 
 -- // ui
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ZazuCats/Newest-Farm-TDS-gem/refs/heads/main/Library.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DuxiiT/auto-strat/refs/heads/main/Sources/GuiSource.lua"))()
 local Console = shared.AutoStratGUI.Console
 
 shared.AutoStratGUI.Status(tostring(game_state))
@@ -432,6 +432,20 @@ local function run_vote_skip()
     end
 end
 
+task.spawn(function()
+    while true do
+        task.wait(2)
+
+        if _G.RTL and game_state == "GAME" then
+            if not is_crossroads_map() then
+                log("No Crossroads detected, returning to lobby", "orange")
+                send_to_lobby()
+                task.wait(8) -- tunggu teleport selesai
+            end
+        end
+    end
+end)
+
 local function match_ready_up()
     local player_gui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
     
@@ -514,9 +528,25 @@ local function is_map_available(name)
     for _, g in ipairs(workspace:GetDescendants()) do
         if g:IsA("SurfaceGui") and g.Name == "MapDisplay" then
             local t = g:FindFirstChild("Title")
-            if t and t.Text == name then return true end
+            if t and t.Text == name then
+                return true
+            end
         end
     end
+    return false
+end
+    
+    local function is_crossroads_map()
+    for _, g in ipairs(workspace:GetDescendants()) do
+        if g:IsA("SurfaceGui") and g.Name == "MapDisplay" then
+            local t = g:FindFirstChild("Title")
+            if t and t.Text and t.Text:lower():find("crossroad") then
+                return true
+            end
+        end
+    end
+    return false
+end
 
     repeat
         remote_event:FireServer("LobbyVoting", "Veto")
@@ -532,6 +562,8 @@ local function is_map_available(name)
                 end
             end
         end
+        
+        
 
         local total_player = #players_service:GetChildren()
         local veto_text = player_gui:WaitForChild("ReactGameIntermission"):WaitForChild("Frame"):WaitForChild("buttons"):WaitForChild("veto"):WaitForChild("value").Text
