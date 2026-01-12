@@ -22,6 +22,13 @@ local anti_lag_running = false
 local auto_chain_running = false
 local auto_dj_running = false
 
+-- Initialize some tracking vars that were referenced but not defined
+local start_coins = (local_player:FindFirstChild("Coins") and local_player.Coins.Value) or 0
+local start_gems = (local_player:FindFirstChild("Gems") and local_player.Gems.Value) or 0
+
+-- game state default (was referenced but not defined anywhere)
+local game_state = "LOBBY"
+
 local ColorMap = {
     green = "#2BFFAE",
     red = "#FF3A3A",
@@ -221,6 +228,12 @@ local function RTL()
     pcall(function()
         teleport_service:Teleport(TDS_LOBBY_PLACE_ID, local_player)
     end)
+end
+
+-- small helper: provide trigger_restart if called elsewhere
+local function trigger_restart()
+    -- fallback: send back to lobby; adjust if you have a dedicated restart remote
+    pcall(send_to_lobby)
 end
 
 -- NEW: check if current displayed map in lobby voting is Crossroads
@@ -476,7 +489,7 @@ local function do_place_tower(t_name, t_pos)
     log("Placing tower: " .. t_name, "green")
     while true do
         local ok, res = pcall(function()
-            return remote_func:InvokeServer("Troops", "Pl\208\176ce", {
+            return remote_func:InvokeServer("Troops", "Place", {
                 Rotation = CFrame.new(),
                 Position = t_pos
             }, t_name)
@@ -675,7 +688,7 @@ end
 function TDS:UnlockTimeScale() unlock_speed_tickets() end
 function TDS:TimeScale(val) set_game_timescale(val) end
 function TDS:StartGame() lobby_ready_up() end
-function TDS:Ready() if game_state ~= "GAME" then return false end match_ready_up() end
+function TDS:Ready() if game_state ~= "LOBBY" then return false end match_ready_up() end
 function TDS:GetWave() return get_current_wave() end
 function TDS:RestartGame() trigger_restart() end
 
@@ -924,7 +937,8 @@ end
 
 local function start_anti_afk()
     local Players = game:GetService("Players")
-    local GC = getconnections and getconnections or get_signal_cons
+    -- prefer getconnections/get_signal_cons if available
+    local GC = getconnections or get_signal_cons
     if GC then
         for i, v in pairs(GC(Players.LocalPlayer.Idled)) do
             if v.Disable then v:Disable()
@@ -947,7 +961,7 @@ end
 
 local function start_rejoin_on_disconnect()
     task.spawn(function()
-        game.Players.PlayerRemoving:connect(function (plr)
+        game.Players.PlayerRemoving:Connect(function (plr)
             if plr == game.Players.LocalPlayer then
                 pcall(function() teleport_service:Teleport(3260590327, plr) end)
             end
@@ -1028,7 +1042,7 @@ task.spawn(function()
     task.wait(8) -- wait for lobby UI to render
     while true do
         task.wait(2)
-        if _G.RTL and (player_gui:FindFirstChild("ReactLobbyHud") ~= nil or true) then
+        if _G.RTL and player_gui:FindFirstChild("ReactLobbyHud") ~= nil then
             -- check MapDisplay in workspace (voting area)
             if not is_crossroads_map() then
                 log("RTL: No Crossroads detected, returning to lobby", "orange")
